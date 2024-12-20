@@ -209,11 +209,11 @@ exports.sendUserData = async (req, res) => {
       success: true,
       message: "User data retrieved successfully.",
       data: {
-        PhoneNumber: user.PhoneNumber,
-        FullName: user.FullName,
-        ProfileImage: user.ProfileImage,
-        AccountBalance: user.AccountBalance,
-        AccountNumber: user.AccountNumber,
+        phoneNumber: user.PhoneNumber,
+        fullName: user.FullName,
+        profileImage: user.ProfileImage,
+        accountBalance: user.AccountBalance,
+        accountNumber: user.AccountNumber,
       },
     });
   } catch (error) {
