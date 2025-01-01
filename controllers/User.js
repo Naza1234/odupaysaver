@@ -3,7 +3,7 @@ require("dotenv").config();
 const twilio = require("twilio");
 const bcrypt = require("bcrypt");
 const LoginCheck = require("../models/LoginCheck");
-
+const fetch = require("node-fetch");
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -58,61 +58,76 @@ exports.sendVerificationCode = async (req, res) => {
 
 
 
+// Import dependencies
+
+
 // User Sign-Up Controller
 exports.userSignUp = async (req, res) => {
   try {
-    const { fullName, phoneNumber, password, pin} = req.body;
+    const {phoneNumber , email, nin } = req.body;
 
     // Check if all required fields are provided
-    if (!fullName || !phoneNumber || !password || !pin) {
+    if (!phoneNumber || !email || !nin) {
       return res.status(400).json({
         success: false,
-        message: "All fields (fullName, phoneNumber, password, pin) are required.",
+        message: "All fields ( phoneNumber, email, nin) are required.",
       });
     }
 
     // Check if the phone number already exists
     const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
     if (existingUser) {
-        return res.status(400).json({
-            success: false,
-            message: "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
-          });
-          
+      return res.status(400).json({
+        success: false,
+        message:
+          "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
+      });
     }
 
-   
-    // Generate a unique account number (e.g., random 10-digit number)
-    const accountNumber = Math.floor(1000000000 + Math.random() * 9000000000);
+    // Prepare headers and body for the API call
+    const myHeaders = {
+      "x-api-key": process.env.WEMA_API_KEY,
+      "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+    };
 
-    // Create a new user object
-    const newUser = new User({
-      FullName: fullName,
-      PhoneNumber: phoneNumber,
-      Password:  password,
-      Pin: pin,
-      AccountNumber: accountNumber,
+    const raw = JSON.stringify({
+      phoneNumber: phoneNumber,
+      email: email,
+      nin: nin,
     });
 
-    // Save the user to the database
-    await newUser.save();
+    const requestOptions = {
+      method: "POST",
+      headers: myHeaders,
+      body: raw,
+    };
 
-    const loginCheck = new LoginCheck({
-        userId: newUser._id, // Link LoginCheck to the newly created user
-      });
-  
-      await loginCheck.save(); // Save the login check document
-  
-     
-      return res.status(201).json({
+    // Call the Wema Bank API
+    const response = await fetch(
+      "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
+      requestOptions
+    );
+
+    const result = await response.json();
+
+    // Handle API response
+    if (response.status === 200) {
+      // If API call succeeds, send success response to frontend
+      return res.status(200).json({
         success: true,
-        message: "User registered successfully!",
-        loginData: {
-          loginTime: loginCheck.loginTime,
-          autoLogoutTime: loginCheck.autoLogoutTime,
-          accessId: loginCheck.accessId,
-        },
+        message: "move on to next step",
+        Response: result,
       });
+    } else {
+      // If API call fails, send failure message back to the frontend
+      return res.status(response.status).json({
+        success: false,
+        message: "Failed to create wallet.",
+        Response: result,
+      });
+    }
   } catch (error) {
     console.error("Error during user sign-up:", error.message);
     return res.status(500).json({
@@ -122,6 +137,226 @@ exports.userSignUp = async (req, res) => {
     });
   }
 };
+
+
+// Generate Wallet Account Controller
+exports.generateWalletAccount = async (req, res) => {
+    try {
+        const { phoneNumber, otp, trackingId } = req.body;
+
+        // Check if all required fields are provided
+        if (!phoneNumber || !otp || !trackingId) {
+            return res.status(400).json({
+                success: false,
+                message: "All fields (phoneNumber, otp, trackingId) are required.",
+            });
+        }
+
+        // Prepare headers and body for the API call
+        const myHeaders = {
+            "x-api-key": process.env.WEMA_API_KEY,
+            "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+        };
+
+        const payload = JSON.stringify({
+            phoneNumber: phoneNumber,
+            otp: otp,
+            trackingId: trackingId,
+        });
+
+        // Call the external API
+        const response = await fetch(
+            "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnershipsV2/Otp",
+            {
+                method: "POST",
+                headers: myHeaders,
+                body: payload,
+            }
+        );
+
+        const result = await response.json();
+
+        // Handle API response
+        if (response.ok) {
+            return res.status(200).json({
+                success: true,
+                message: "Wallet account generated successfully.",
+                Response: result,
+            });
+        } else {
+            return res.status(response.status).json({
+                success: false,
+                message: "Failed to generate wallet account.",
+                Response: result,
+            });
+        }
+    } catch (error) {
+        console.error("Error generating wallet account:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while generating the wallet account. Please try again later.",
+            error: error.message,
+        });
+    }
+};
+
+
+// User Account Details Retrieval Controller
+exports.getAccountDetailsAndSignUp = async (req, res) => {
+  try {
+    const { phoneNumber, password, pin } = req.body;
+
+    // Check if all required fields are provided
+    if (!phoneNumber || !password || !pin) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields (phoneNumber, password, pin) are required.",
+      });
+    }
+
+    // Make the GET request to the Wema API
+    const apiUrl = `https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GetPartnershipAccountDetails?phoneNumber=${phoneNumber}`;
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'x-api-key': process.env.WEMA_API_KEY,
+        'Ocp-Apim-Subscription-Key': process.env.WEMA_SUBSCRIPTION_KEY,
+        'Cache-Control': 'no-cache',
+      },
+    });
+
+    // Parse the API response
+    const result = await response.json();
+
+    // Handle non-200 responses
+    if (!response.ok || !result.status) {
+      return res.status(response.status).json({
+        success: false,
+        message: result,
+      });
+    }
+
+    // Extract data from the successful response
+    const { accountNumber, firstName, lastName, email } = result.data;
+
+    // Check if the phone number already exists
+    const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
+      });
+    }
+
+    // Create a new user object
+    const newUser = new User({
+      FullName: `${firstName} ${lastName}`,
+      PhoneNumber: phoneNumber,
+      Password: password, // Use bcrypt to hash passwords in real scenarios
+      Pin: pin,
+      Email: email,
+      AccountNumber: accountNumber,
+    });
+
+    // Save the user to the database
+    await newUser.save();
+
+    // Create a login check object
+    const loginCheck = new LoginCheck({
+      userId: newUser._id, // Link LoginCheck to the newly created user
+    });
+
+    // Save the login check document
+    await loginCheck.save();
+
+    // Return a success response
+    return res.status(201).json({
+      success: true,
+      message: "User registered successfully!",
+      loginData: {
+        loginTime: loginCheck.loginTime,
+        autoLogoutTime: loginCheck.autoLogoutTime,
+        accessId: loginCheck.accessId,
+      },
+    });
+  } catch (error) {
+    console.error("Error during user sign-up:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while processing your request. Please try again later.",
+      error: error.message,
+    });
+  }
+};
+
+
+
+// // User Sign-Up Controller
+// exports.userSignUp = async (req, res) => {
+//   try {
+//     const { fullName, phoneNumber, password, pin} = req.body;
+
+//     // Check if all required fields are provided
+//     if (!fullName || !phoneNumber || !password || !pin) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields (fullName, phoneNumber, password, pin) are required.",
+//       });
+//     }
+
+//     // Check if the phone number already exists
+//     const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
+//     if (existingUser) {
+//         return res.status(400).json({
+//             success: false,
+//             message: "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
+//           });
+          
+//     }
+
+   
+//     // Generate a unique account number (e.g., random 10-digit number)
+//     const accountNumber = Math.floor(1000000000 + Math.random() * 9000000000);
+
+//     // Create a new user object
+//     const newUser = new User({
+//       FullName: fullName,
+//       PhoneNumber: phoneNumber,
+//       Password:  password,
+//       Pin: pin,
+//       AccountNumber: accountNumber,
+//     });
+
+//     // Save the user to the database
+//     await newUser.save();
+
+//     const loginCheck = new LoginCheck({
+//         userId: newUser._id, // Link LoginCheck to the newly created user
+//       });
+  
+//       await loginCheck.save(); // Save the login check document
+  
+     
+//       return res.status(201).json({
+//         success: true,
+//         message: "User registered successfully!",
+//         loginData: {
+//           loginTime: loginCheck.loginTime,
+//           autoLogoutTime: loginCheck.autoLogoutTime,
+//           accessId: loginCheck.accessId,
+//         },
+//       });
+//   } catch (error) {
+//     console.error("Error during user sign-up:", error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: "An error occurred while registering the user. Please try again later.",
+//       error: error.message,
+//     });
+//   }
+// };
 
 
 
