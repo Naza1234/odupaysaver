@@ -101,7 +101,7 @@ exports.userSignUp = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "An error occurred while registering the user. Please try again later.",
-      error: error.message,
+      error: error,
     });
   }
 };
