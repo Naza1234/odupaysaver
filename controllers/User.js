@@ -1,9 +1,9 @@
-const User = require("../models/User"); 
+const User = require("../models/User");
 require("dotenv").config();
 const twilio = require("twilio");
 const bcrypt = require("bcrypt");
 const LoginCheck = require("../models/LoginCheck");
-const fetch = require("node-fetch");
+const axios = require("axios"); // Replace fetch with axios
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -16,19 +16,16 @@ exports.sendVerificationCode = async (req, res) => {
   try {
     const { phoneNumber } = req.body;
 
-    // Check if phoneNumber exists in the request
     if (!phoneNumber) {
-        return res.status(400).json({
-            success: false,
-            message: "Oops! It looks like you forgot to provide a phone number. Please double-check and try again—we can’t send a code without it!",
-            hint: "Ensure your phone number is in the format +1234567890.",
-          });  
+      return res.status(400).json({
+        success: false,
+        message: "Oops! It looks like you forgot to provide a phone number. Please double-check and try again—we can’t send a code without it!",
+        hint: "Ensure your phone number is in the format +1234567890.",
+      });
     }
 
     // Generate a 6-digit random verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000);
-
-
 
     // Send SMS using Twilio
     await client.messages.create({
@@ -37,16 +34,11 @@ exports.sendVerificationCode = async (req, res) => {
       to: phoneNumber,
     });
 
-    // Respond with success
     res.status(200).json({
-        success: true,
-        message: `Hello! Your verification code has been sent to ${phoneNumber}. Please check your SMS inbox and enter the code to proceed.`,
-        data: {
-          phoneNumber,
-          code:verificationCode,
-        },
-      });
-      
+      success: true,
+      message: `Hello! Your verification code has been sent to ${phoneNumber}. Please check your SMS inbox and enter the code to proceed.`,
+      data: { phoneNumber, code: verificationCode },
+    });
   } catch (error) {
     console.error("Error sending verification code:", error.message);
     res.status(500).json({
@@ -56,76 +48,52 @@ exports.sendVerificationCode = async (req, res) => {
   }
 };
 
-
-
-// Import dependencies
-
-
 // User Sign-Up Controller
 exports.userSignUp = async (req, res) => {
   try {
-    const {phoneNumber , email, nin } = req.body;
+    const { phoneNumber, email, nin } = req.body;
 
-    // Check if all required fields are provided
     if (!phoneNumber || !email || !nin) {
       return res.status(400).json({
         success: false,
-        message: "All fields ( phoneNumber, email, nin) are required.",
+        message: "All fields (phoneNumber, email, nin) are required.",
       });
     }
 
-    // Check if the phone number already exists
     const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message:
-          "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
+        message: "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
       });
     }
 
-    // Prepare headers and body for the API call
-    const myHeaders = {
-      "x-api-key": process.env.WEMA_API_KEY,
-      "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
-      "Content-Type": "application/json",
-      "Cache-Control": "no-cache",
-    };
+    const requestBody = { phoneNumber, email, nin };
 
-    const raw = JSON.stringify({
-      phoneNumber: phoneNumber,
-      email: email,
-      nin: nin,
-    });
-
-    const requestOptions = {
-      method: "POST",
-      headers: myHeaders,
-      body: raw,
-    };
-
-    // Call the Wema Bank API
-    const response = await fetch(
+    // Call the Wema Bank API using axios
+    const response = await axios.post(
       "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
-      requestOptions
+      requestBody,
+      {
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+          "Content-Type": "application/json",
+        },
+      }
     );
 
-    const result = await response.json();
-
-    // Handle API response
     if (response.status === 200) {
-      // If API call succeeds, send success response to frontend
       return res.status(200).json({
         success: true,
-        message: "move on to next step",
-        Response: result,
+        message: "Move on to the next step",
+        Response: response.data,
       });
     } else {
-      // If API call fails, send failure message back to the frontend
       return res.status(response.status).json({
         success: false,
         message: "Failed to create wallet.",
-        Response: result,
+        Response: response.data,
       });
     }
   } catch (error) {
@@ -138,77 +106,61 @@ exports.userSignUp = async (req, res) => {
   }
 };
 
-
 // Generate Wallet Account Controller
 exports.generateWalletAccount = async (req, res) => {
-    try {
-        const { phoneNumber, otp, trackingId } = req.body;
+  try {
+    const { phoneNumber, otp, trackingId } = req.body;
 
-        // Check if all required fields are provided
-        if (!phoneNumber || !otp || !trackingId) {
-            return res.status(400).json({
-                success: false,
-                message: "All fields (phoneNumber, otp, trackingId) are required.",
-            });
-        }
-
-        // Prepare headers and body for the API call
-        const myHeaders = {
-            "x-api-key": process.env.WEMA_API_KEY,
-            "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-        };
-
-        const payload = JSON.stringify({
-            phoneNumber: phoneNumber,
-            otp: otp,
-            trackingId: trackingId,
-        });
-
-        // Call the external API
-        const response = await fetch(
-            "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnershipsV2/Otp",
-            {
-                method: "POST",
-                headers: myHeaders,
-                body: payload,
-            }
-        );
-
-        const result = await response.json();
-
-        // Handle API response
-        if (response.ok) {
-            return res.status(200).json({
-                success: true,
-                message: "Wallet account generated successfully.",
-                Response: result,
-            });
-        } else {
-            return res.status(response.status).json({
-                success: false,
-                message: "Failed to generate wallet account.",
-                Response: result,
-            });
-        }
-    } catch (error) {
-        console.error("Error generating wallet account:", error.message);
-        return res.status(500).json({
-            success: false,
-            message: "An error occurred while generating the wallet account. Please try again later.",
-            error: error.message,
-        });
+    if (!phoneNumber || !otp || !trackingId) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields (phoneNumber, otp, trackingId) are required.",
+      });
     }
-};
 
+    const payload = { phoneNumber, otp, trackingId };
+
+    // Call the API using axios
+    const response = await axios.post(
+      "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnershipsV2/Otp",
+      payload,
+      {
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      return res.status(200).json({
+        success: true,
+        message: "Wallet account generated successfully.",
+        Response: response.data,
+      });
+    } else {
+      return res.status(response.status).json({
+        success: false,
+        message: "Failed to generate wallet account.",
+        Response: response.data,
+      });
+    }
+  } catch (error) {
+    console.error("Error generating wallet account:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while generating the wallet account. Please try again later.",
+      error: error.message,
+    });
+  }
+};
 
 // User Account Details Retrieval Controller
 exports.getAccountDetailsAndSignUp = async (req, res) => {
   try {
     const { phoneNumber, password, pin } = req.body;
 
-    // Check if all required fields are provided
     if (!phoneNumber || !password || !pin) {
       return res.status(400).json({
         success: false,
@@ -216,32 +168,27 @@ exports.getAccountDetailsAndSignUp = async (req, res) => {
       });
     }
 
-    // Make the GET request to the Wema API
-    const apiUrl = `https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GetPartnershipAccountDetails?phoneNumber=${phoneNumber}`;
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'x-api-key': process.env.WEMA_API_KEY,
-        'Ocp-Apim-Subscription-Key': process.env.WEMA_SUBSCRIPTION_KEY,
-        'Cache-Control': 'no-cache',
-      },
-    });
+    // Make the GET request using axios
+    const response = await axios.get(
+      `https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GetPartnershipAccountDetails`,
+      {
+        params: { phoneNumber },
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+        },
+      }
+    );
 
-    // Parse the API response
-    const result = await response.json();
-
-    // Handle non-200 responses
-    if (!response.ok || !result.status) {
+    if (!response.data || !response.data.status) {
       return res.status(response.status).json({
         success: false,
-        message: result,
+        message: response.data,
       });
     }
 
-    // Extract data from the successful response
-    const { accountNumber, firstName, lastName, email } = result.data;
+    const { accountNumber, firstName, lastName, email } = response.data.data;
 
-    // Check if the phone number already exists
     const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
     if (existingUser) {
       return res.status(400).json({
@@ -250,28 +197,20 @@ exports.getAccountDetailsAndSignUp = async (req, res) => {
       });
     }
 
-    // Create a new user object
     const newUser = new User({
       FullName: `${firstName} ${lastName}`,
       PhoneNumber: phoneNumber,
-      Password: password, // Use bcrypt to hash passwords in real scenarios
+      Password: password,
       Pin: pin,
       Email: email,
       AccountNumber: accountNumber,
     });
 
-    // Save the user to the database
     await newUser.save();
 
-    // Create a login check object
-    const loginCheck = new LoginCheck({
-      userId: newUser._id, // Link LoginCheck to the newly created user
-    });
-
-    // Save the login check document
+    const loginCheck = new LoginCheck({ userId: newUser._id });
     await loginCheck.save();
 
-    // Return a success response
     return res.status(201).json({
       success: true,
       message: "User registered successfully!",
