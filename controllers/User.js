@@ -48,9 +48,11 @@ exports.sendVerificationCode = async (req, res) => {
   }
 };
 
-// User Sign-Up Controller
+
+
 exports.userSignUp = async (req, res) => {
   try {
+    // Hardcoded test data
     const { phoneNumber, email, nin } = req.body;
 
     if (!phoneNumber || !email || !nin) {
@@ -68,43 +70,123 @@ exports.userSignUp = async (req, res) => {
       });
     }
 
-    const requestBody = { phoneNumber, email, nin };
+    const requestBody = {
+                          phoneNumber : phoneNumber,
+                          email : email , 
+                          nin : nin 
+                        };
 
     // Call the Wema Bank API using axios
-    const response = await axios.post(
-      "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
-      requestBody,
-      {
-        headers: {
-          "x-api-key": process.env.WEMA_API_KEY,
-          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (response.status === 200) {
-      return res.status(200).json({
-        success: true,
-        message: "Move on to the next step",
-        Response: response.data,
+    axios
+      .post(
+        "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
+        requestBody,
+        {
+          headers: {
+            "x-api-key": process.env.WEMA_API_KEY,
+            "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+          },
+        }
+      )
+      .then((response) => {
+      
+        if (response.status === 200) {
+                return res.status(200).json({
+                  success: true,
+                  message: "Move on to the next step",
+                  Response: response.data,
+                });
+              } else {
+                return res.status(response.status).json({
+                  success: false,
+                  message: "Failed to create wallet.",
+                  Response: response.data,
+                });
+              }
+      })
+      .catch((error) => {
+        return res.status(error.response?.status || 500).json({
+          success: false,
+          message: error.response?.data.message|| "Failed to create wallet.",
+          error: error.response?.data || "An unexpected error occurred.",
+        });
       });
-    } else {
-      return res.status(response.status).json({
-        success: false,
-        message: "Failed to create wallet.",
-        Response: response.data,
-      });
-    }
   } catch (error) {
+    // Handle unexpected server-side errors
     console.error("Error during user sign-up:", error.message);
     return res.status(500).json({
       success: false,
       message: "An error occurred while registering the user. Please try again later.",
-      error: error,
+      error: error.message,
     });
   }
 };
+
+
+
+// exports.userSignUp = async (req, res) => {
+//   try {
+//     const { phoneNumber, email, nin } = req.body;
+
+//     if (!phoneNumber || !email || !nin) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields (phoneNumber, email, nin) are required.",
+//       });
+//     }
+
+//     const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
+//     if (existingUser) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
+//       });
+//     }
+
+//     const requestBody = {
+//                           phoneNumber : phoneNumber,
+//                           email : email , 
+//                           nin : nin 
+//                         };
+
+//     // Call the Wema Bank API using axios
+//     const response = await axios.post(
+//       "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
+//       requestBody,
+//       {
+//         headers: {
+//           "x-api-key": process.env.WEMA_API_KEY,
+//           "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+//           "Content-Type": "application/json",
+//           "Cache-Control": "no-cache"
+//         },
+//       }
+//     );
+//    console.log(response);
+//     if (response.status === 200) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "Move on to the next step",
+//         Response: response.data,
+//       });
+//     } else {
+//       return res.status(response.status).json({
+//         success: false,
+//         message: "Failed to create wallet.",
+//         Response: response.data,
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error during user sign-up:", error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: "An error occurred while registering the user. Please try again later.",
+//       error: error,
+//     });
+//   }
+// };
 
 // Generate Wallet Account Controller
 exports.generateWalletAccount = async (req, res) => {
