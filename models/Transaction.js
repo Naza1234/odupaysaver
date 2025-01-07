@@ -2,51 +2,80 @@ const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema(
   {
-    accountNumber: {
+    title: {
       type: String,
       required: true,
-    },
-    accountName: {
-      type: String,
-      required: true,
-    },
-    bankName: {
-      type: String,
-      required: true,
-    },
-    transactionType: {
-      type: String,
-      required: true,
-      enum: ["deposit", "withdrawal", "airtime", "cardDeposit", "data"], // Ensure only valid transaction types are used
+      trim: true,
     },
     amount: {
       type: Number,
       required: true,
       min: 0, // Ensure no negative values
     },
-    description: {
+    type: {
       type: String,
-      default: "No description provided",
+      required: true,
+    },
+    date: {
+      type: String, // ISO date format recommended, e.g., "YYYY-MM-DD"
+      required: true,
+    },
+    transactionDate: {
+      type: String, // ISO date format recommended
+      required: true,
+    },
+    narration: {
+      type: String,
+      default: "No narration provided",
       trim: true,
     },
-    transactionId: {
+    status: {
+      type: String,
+      required: true,
+      default: "Default",
+    },
+    creditType: {
+      type: String,
+      required: true,
+      default: "Default",
+    },
+    sender: {
+      type: String,
+      required: true,
+    },
+    senderAccountNumber: {
+      type: String,
+      required: true,
+    },
+    destinationBank: {
+      type: String,
+      required: true,
+    },
+    destinationAccountNumber: {
+      type: String,
+      required: true,
+    },
+    recieverName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    referenceId: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    isViewReceiptEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    tranId: {
       type: String,
       unique: true,
       required: true,
       default: function () {
-        return `TRX-${Math.floor(100000000 + Math.random() * 900000000)}`; // Generates a unique transaction ID
+        return `TRX-${Math.floor(100000000 + Math.random() * 900000000)}`; // Generate a unique transaction ID
       },
-    },
-    receiverNo: {
-      type: String,
-      match: [/^\d{10,15}$/, "Invalid receiver number"], // Optional field for airtime transactions
-    },
-    networkProvider: {
-      type: String, // Optional field for airtime or data transactions
-      enum: ["MTN", "Airtel", "Glo", "9mobile"], // Add more if needed
-    },
-    dataValue: {
-      type: String, // Optional field for data transactions
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -16,9 +16,11 @@ app.use("/image", express.static("./image"));
 
 // Import all routes
 const userRoutes = require('./routes/User');
+const transactionRoutes = require('./routes/Transaction');
 
 // Use the routes
 app.use("/user", userRoutes);
+app.use("/transaction", transactionRoutes);
 
 
 

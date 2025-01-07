@@ -125,69 +125,6 @@ exports.userSignUp = async (req, res) => {
 };
 
 
-
-// exports.userSignUp = async (req, res) => {
-//   try {
-//     const { phoneNumber, email, nin } = req.body;
-
-//     if (!phoneNumber || !email || !nin) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "All fields (phoneNumber, email, nin) are required.",
-//       });
-//     }
-
-//     const existingUser = await User.findOne({ PhoneNumber: phoneNumber });
-//     if (existingUser) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Whoops! This phone number is already on our system. If it’s yours, try logging in instead of signing up. Need help? Contact support!",
-//       });
-//     }
-
-//     const requestBody = {
-//                           phoneNumber : phoneNumber,
-//                           email : email , 
-//                           nin : nin 
-//                         };
-
-//     // Call the Wema Bank API using axios
-//     const response = await axios.post(
-//       "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
-//       requestBody,
-//       {
-//         headers: {
-//           "x-api-key": process.env.WEMA_API_KEY,
-//           "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
-//           "Content-Type": "application/json",
-//           "Cache-Control": "no-cache"
-//         },
-//       }
-//     );
-//    console.log(response);
-//     if (response.status === 200) {
-//       return res.status(200).json({
-//         success: true,
-//         message: "Move on to the next step",
-//         Response: response.data,
-//       });
-//     } else {
-//       return res.status(response.status).json({
-//         success: false,
-//         message: "Failed to create wallet.",
-//         Response: response.data,
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error during user sign-up:", error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: "An error occurred while registering the user. Please try again later.",
-//       error: error,
-//     });
-//   }
-// };
-
 // Generate Wallet Account Controller
 exports.generateWalletAccount = async (req, res) => {
   try {
@@ -241,12 +178,12 @@ exports.generateWalletAccount = async (req, res) => {
 // User Account Details Retrieval Controller
 exports.getAccountDetailsAndSignUp = async (req, res) => {
   try {
-    const { phoneNumber, password, pin } = req.body;
+    const { phoneNumber, password, pin ,trackingId} = req.body;
 
-    if (!phoneNumber || !password || !pin) {
+    if (!phoneNumber || !password || !pin || !trackingId) {
       return res.status(400).json({
         success: false,
-        message: "All fields (phoneNumber, password, pin) are required.",
+        message: "All fields (phoneNumber, password, pin , trackingId) are required.",
       });
     }
 
@@ -282,9 +219,10 @@ exports.getAccountDetailsAndSignUp = async (req, res) => {
     const newUser = new User({
       FullName: `${firstName} ${lastName}`,
       PhoneNumber: phoneNumber,
-      Password: password,
+      Password: password, 
       Pin: pin,
       Email: email,
+      trackingId : trackingId,
       AccountNumber: accountNumber,
     });
 
@@ -567,6 +505,412 @@ exports.changeUserPassword = async (req, res) => {
       success: false,
       message: "Internal server error. Please try again later.",
     });
+  }
+};
+
+
+// "buildingNumber": "string",
+// "apartment": "string",
+// "street": "string",
+// "city": "string",
+// "town": "string",
+// "state": "string",
+// "lga": "string",
+// "lcda": "string",
+// "landmark": "string",
+// "additionalInformation": "string",
+// "country": "string",
+// "fullAddress": "string",
+// "postalCode": "string"
+
+
+// Controller function for submitting Tier 1 partner address
+exports.submitTier1PartnerAddress = async (req, res) => {
+  try {
+    // Extract data from the request body
+    const { userId } = req;
+
+    const {
+      residentialAddress,
+      accountNumber,
+      nin,
+      bvn,
+      liveImageOfFace,
+    } = req.body;
+
+    // Validate the required fields
+    if (!residentialAddress || !accountNumber || !nin || !bvn || !liveImageOfFace) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required.",
+      });
+    }
+
+    // API Endpoint
+    const url = "http://apiplayground.alat.ng/account-upgrade/api/CustomerAccount/SubmitTier1PartnerAddress";
+
+    // Headers
+    const headers = {
+      "x-api-key": process.env.WEMA_API_KEY,
+      "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY, // Replace with your API key or store it in .env
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+    };
+
+    // Payload
+    const payload = {
+      residentialAddress,
+      accountNumber,
+      nin,
+      bvn,
+      liveImageOfFace,
+    };
+
+    // Make the API call
+    const response = await axios.post(url, payload, { headers });
+
+    const user = await User.findById(userId);
+    user.Addresses.push(residentialAddress);
+
+    // Save the updated user document
+    await user.save();
+    // Respond with the API response data
+    res.status(response.status).json({
+      success: true,
+      message: "Request successful",
+      data: response.data,
+    });
+  } catch (error) {
+    console.error("Error submitting Tier 1 partner address:", error.message);
+
+    // Handle error response
+    if (error.response) {
+      return res.status(error.response.status).json({
+        success: false,
+        message: error.response.data || "API request failed.",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "An internal server error occurred.",
+    });
+  }
+};
+
+
+
+exports.submitPartnerAddress = async (req, res) => {
+  try {
+    // Extract residentialAddress and accountNumber from req.body
+    const { userId } = req;
+    const { residentialAddress, accountNumber } = req.body;
+
+    // Validation: Ensure required fields are provided
+    if (!residentialAddress || !accountNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: 'residentialAddress' or 'accountNumber'.",
+      });
+    }
+
+    // Define API URL
+    const apiUrl = "http://apiplayground.alat.ng/account-upgrade/api/CustomerAccount/SubmitPartnerAddress";
+
+    // Set headers
+    const headers = {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+      "x-api-key": process.env.WEMA_API_KEY,
+      "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+    };
+
+    // Define payload
+    const payload = {
+      residentialAddress,
+      accountNumber,
+    };
+
+    // Make API request
+    const apiResponse = await axios.post(apiUrl, payload, { headers });
+
+    const user = await User.findById(userId);
+     user.Addresses[0] = {
+      ...user.Addresses[0],
+      ...residentialAddress, // Merge updated fields
+    };
+
+    // Save the updated user document
+    await user.save();
+    // Send API response back to the frontend
+    res.status(apiResponse.status).json({
+      success: true,
+      message: "Partner address submitted successfully.",
+      data: apiResponse.data,
+    });
+  } catch (error) {
+    // Handle errors
+    console.error("Error submitting partner address:", error.message);
+    if (error.response) {
+      // API responded with an error status code
+      return res.status(error.response.status).json({
+        success: false,
+        message: error.response.data || "Error from the API.",
+      });
+    }
+    // Other errors (e.g., network issues)
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error.",
+    });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+exports.requestCard = async (req, res) => {
+  try {
+    // Extract userId from the request body
+    const { cardKey, amount, creditLimit } = req.body;
+    const { userId } = req;
+    // Find the user by their ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // Get the first address from the user's Addresses array
+    const primaryAddress = user.Addresses[0];
+
+    if (!primaryAddress) {
+      return res.status(400).json({ error: "No address found for the user." });
+    }
+
+    // Prepare the payload for the external API
+    const payload = {
+      accountNumber: user.AccountNumber,
+      emailaddress: user.Email,
+      phoneNumber: user.PhoneNumber,
+      streetAddress: primaryAddress.street,
+      city: primaryAddress.city,
+      nearestBustop: primaryAddress.landmark || "Not provided", // Default value if landmark is missing
+      state: primaryAddress.state,
+      compoundName: primaryAddress.additionalInformation || "Not provided", // Default value if missing
+      lga: primaryAddress.lga,
+      lcda: primaryAddress.lcda,
+      apartment: primaryAddress.apartment,
+      cardKey: cardKey, // From req.body
+      amount: amount, // From req.body
+      creditLimit: creditLimit, // From req.body
+    };
+
+    // Make the request to the external API
+    const response = await axios.post(
+      "https://apiplayground.alat.ng/card-management/api/Partner/partnerCard/request",
+      payload,
+      {
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+      }
+    );
+
+    // Respond with the data from the external API
+    res.status(200).json({ success: true, data: response.data });
+  } catch (error) {
+    console.error("Error in requestCardController:", error);
+
+    if (error.response) {
+      // Handle errors from the external API
+      res.status(error.response.status).json({ error: error.response.data });
+    } else {
+      // Handle other errors
+      res.status(500).json({ error: "An error occurred while processing your request." });
+    }
+  }
+};
+
+
+exports.changeCardPin = async (req, res) => {
+  try {
+    // Extract the userId and card data from the request
+    const { userId } = req;
+    const { newPin, oldPin, fullPan } = req.body;
+
+    // Validate inputs
+    if (!newPin || !oldPin || !fullPan) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Find the card by fullPan
+    const card = user.Cards.find((card) => card.fullPan === fullPan);
+    if (!card) {
+      return res.status(404).json({ message: "Card not found." });
+    }
+
+    // Prepare the API payload
+    const payload = {
+      accountNumber: user.AccountNumber,
+      newPin,
+      oldPin,
+      expiryDate: card.expiryDate,
+      emailAddress: user.Email,
+      fullPan,
+    };
+
+    // Make the API request
+    const response = await axios.post(
+      "https://apiplayground.alat.ng/card-management/api/Partner/partnerCard/changeCardPin",
+      payload,
+      {
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+      }
+    );
+
+    // Handle successful response
+    if (response.status === 200) {
+      return res.status(200).json({ message: "Card PIN updated successfully." });
+    } else {
+      return res
+        .status(response.status)
+        .json({ message: response.data || "Failed to update card PIN." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+
+exports.activateCard = async (req, res) => {
+  try {
+    // Extract the userId and card data from the request
+    const { userId } = req;
+    const { newPin, fullPan } = req.body;
+
+    // Validate inputs
+    if (!newPin || !fullPan) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Find the card by fullPan
+    const card = user.Cards.find((card) => card.fullPan === fullPan);
+    if (!card) {
+      return res.status(404).json({ message: "Card not found." });
+    }
+
+    // Prepare the API payload
+    const payload = {
+      accountNumber: user.AccountNumber,
+      newPin,
+      expiryDate: card.expiryDate,
+      emailAddress: user.Email,
+      fullPan,
+    };
+
+    // Make the API request
+    const response = await axios.post(
+      "https://apiplayground.alat.ng/card-management/api/Partner/partnerCard/activateCard",
+      payload,
+      {
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Ocp-Apim-Subscription-Key": process.env.WEMA_SUBSCRIPTION_KEY,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+      }
+    );
+
+    // Handle successful response
+    if (response.status === 200) {
+      // Update card status to "active" in the database
+      card.cardStatus = "active";
+      await user.save();
+
+      return res.status(200).json({ message: "Card activated successfully." });
+    } else {
+      return res
+        .status(response.status)
+        .json({ message: response.data || "Failed to activate card." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+
+exports.retrieveCard = async (req, res) => {
+  try {
+    // Extract userId from the request
+    const { userId } = req;
+
+    // Find the user by their ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Get the account number from the user's model
+    const accountNumber = user.AccountNumber;
+    if (!accountNumber) {
+      return res.status(400).json({ message: "Account number not found for this user." });
+    }
+
+    // Make the GET request to retrieve the card
+    const response = await axios.get(
+      `https://apiplayground.alat.ng/card-management/api/Partner/partnerCard/retrieveCard/${accountNumber}`,
+      {
+        headers: {
+          "x-api-key": process.env.WEMA_API_KEY,
+          "Cache-Control": "no-cache",
+          "Ocp-Apim-Subscription-Key": "fb8be6bba5b24dfa9e42758aa276287a",
+        },
+      }
+    );
+
+    // Handle the API response
+    if (response.status === 200) {
+      return res.status(200).json(response.data); // Return the retrieved card data
+    } else {
+      return res
+        .status(response.status)
+        .json({ message: response.data || "Failed to retrieve card." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: "Internal server error." });
   }
 };
 
